@@ -1,0 +1,91 @@
+Create a complete Battleship Web Application with the following specifications.
+
+Game Modes:
+
+Player vs Computer (AI)
+
+Player vs Player (online multiplayer)
+
+Board:
+
+Each player has a 10x10 grid
+
+Columns labeled A–J and rows 1–10
+
+Two boards visible for the player:
+
+Player board (shows ships and enemy hits)
+
+Target board (shows attacks on opponent)
+
+Ships:
+Use standard Battleship ships:
+
+Carrier (5)
+
+Battleship (4)
+
+Cruiser (3)
+
+Submarine (3)
+
+Destroyer (2)
+
+Ship Placement:
+
+Drag-and-drop ship placement on the grid
+
+Ships can be rotated horizontally or vertically
+
+Validate no overlap and no out-of-bounds placement
+
+Computer places ships randomly
+
+Gameplay:
+
+Players take turns attacking coordinates
+
+Show hit, miss, or sunk ship
+
+Prevent attacking same coordinate twice
+
+Display turn indicator
+
+Update boards in real time
+
+AI Mode:
+
+Computer opponent
+
+Start with random attacks
+
+After a hit, AI should try adjacent cells (simple hunt-target strategy)
+
+Multiplayer Mode:
+
+One player creates a game room
+
+Another player joins using a room code
+
+Synchronize board states and turns in real time
+
+Game Logic:
+Implement modular code with clear separation:
+
+UI Features:
+
+Clean modern interface
+
+Highlight hits (red) and misses (gray)
+
+Display sunk ships
+
+Show current turn
+
+Restart game option
+
+Ensure the code is production-quality, modular, and easy to extend.
+
+Ensure the game is user friendly and aesthetically pleasing
+
+Make the repo on allrounder27 github and host is using azure in the gautambafna2708@gmail.com account in subscription 91f863e3-dc69-4f30-8e5f-d48f7cb98580

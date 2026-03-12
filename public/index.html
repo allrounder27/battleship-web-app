@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Battleship</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <!-- MAIN MENU -->
+  <div id="menu-screen" class="screen active">
+    <div class="menu-container">
+      <div class="title-section">
+        <h1 class="game-title">BATTLESHIP</h1>
+        <p class="subtitle">Naval Combat Strategy Game</p>
+      </div>
+      <div class="menu-buttons">
+        <button id="btn-vs-ai" class="menu-btn">
+          <span class="btn-icon">🤖</span>
+          <span class="btn-text">Player vs Computer</span>
+        </button>
+        <button id="btn-multiplayer" class="menu-btn">
+          <span class="btn-icon">👥</span>
+          <span class="btn-text">Multiplayer</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MULTIPLAYER LOBBY -->
+  <div id="lobby-screen" class="screen">
+    <div class="lobby-container">
+      <h2>Multiplayer Lobby</h2>
+      <div class="lobby-buttons">
+        <button id="btn-create-room" class="menu-btn">
+          <span class="btn-icon">🏠</span>
+          <span class="btn-text">Create Room</span>
+        </button>
+        <div class="join-section">
+          <input type="text" id="room-code-input" placeholder="Enter room code" maxlength="6" autocomplete="off">
+          <button id="btn-join-room" class="menu-btn small">
+            <span class="btn-text">Join</span>
+          </button>
+        </div>
+      </div>
+      <div id="lobby-status" class="status-message"></div>
+      <button id="btn-lobby-back" class="back-btn">← Back to Menu</button>
+    </div>
+  </div>
+
+  <!-- SHIP PLACEMENT -->
+  <div id="placement-screen" class="screen">
+    <div class="placement-container">
+      <h2>Deploy Your Fleet</h2>
+      <p class="placement-instructions">Drag ships onto the board. Right-click or press R to rotate.</p>
+      <div class="placement-layout">
+        <div class="ship-dock" id="ship-dock">
+          <h3>Ships</h3>
+          <div class="dock-ships" id="dock-ships"></div>
+          <button id="btn-random-placement" class="action-btn">Random</button>
+          <button id="btn-reset-placement" class="action-btn">Reset</button>
+        </div>
+        <div class="board-wrapper">
+          <div class="board-label">Your Board</div>
+          <div class="board" id="placement-board"></div>
+        </div>
+      </div>
+      <button id="btn-ready" class="ready-btn" disabled>Ready for Battle!</button>
+      <div id="placement-status" class="status-message"></div>
+    </div>
+  </div>
+
+  <!-- GAME SCREEN -->
+  <div id="game-screen" class="screen">
+    <div class="game-container">
+      <div id="turn-indicator" class="turn-indicator">Your Turn</div>
+      <div class="boards-container">
+        <div class="board-section">
+          <div class="board-label">Your Fleet</div>
+          <div class="board" id="player-board"></div>
+          <div class="ship-status" id="player-ship-status"></div>
+        </div>
+        <div class="board-section">
+          <div class="board-label">Enemy Waters</div>
+          <div class="board target-board" id="target-board"></div>
+          <div class="ship-status" id="enemy-ship-status"></div>
+        </div>
+      </div>
+      <div id="game-log" class="game-log"></div>
+    </div>
+  </div>
+
+  <!-- GAME OVER -->
+  <div id="gameover-screen" class="screen">
+    <div class="gameover-container">
+      <h2 id="gameover-title">Game Over</h2>
+      <p id="gameover-message"></p>
+      <button id="btn-play-again" class="menu-btn">
+        <span class="btn-icon">🔄</span>
+        <span class="btn-text">Play Again</span>
+      </button>
+      <button id="btn-main-menu" class="menu-btn">
+        <span class="btn-icon">🏠</span>
+        <span class="btn-text">Main Menu</span>
+      </button>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="js/Board.js"></script>
+  <script src="js/ShipPlacement.js"></script>
+  <script src="js/GameUI.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
