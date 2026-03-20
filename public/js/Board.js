@@ -28,7 +28,6 @@ function createBoardDOM(containerId, onClick) {
 
   // Rows
   for (let r = 0; r < BOARD_SIZE; r++) {
-    // Row header
     const rowHeader = document.createElement('div');
     rowHeader.className = 'board-header';
     rowHeader.textContent = r + 1;
@@ -74,7 +73,8 @@ function renderShipStatus(containerId, ships, sunkShips) {
     const item = document.createElement('div');
     const isSunk = sunkShips.includes(ship.name);
     item.className = 'ship-status-item' + (isSunk ? ' sunk' : '');
-    item.innerHTML = `<span class="dot"></span><span class="ship-name">${ship.name} (${ship.size})</span>`;
+    const dots = '■'.repeat(ship.size);
+    item.innerHTML = `<span class="dot"></span><span class="ship-name">${ship.name}</span><span class="ship-dots">${dots}</span>`;
     container.appendChild(item);
   }
 }

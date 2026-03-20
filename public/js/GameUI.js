@@ -40,10 +40,10 @@ class GameUI {
     this.myTurn = isMyTurn;
     const indicator = document.getElementById('turn-indicator');
     if (isMyTurn) {
-      indicator.textContent = 'Your Turn — Fire!';
+      indicator.textContent = '🎯 Your Turn — Fire!';
       indicator.className = 'turn-indicator your-turn';
     } else {
-      indicator.textContent = 'Enemy Turn — Brace!';
+      indicator.textContent = '⏳ Enemy Turn — Brace!';
       indicator.className = 'turn-indicator enemy-turn';
     }
   }
@@ -52,32 +52,36 @@ class GameUI {
     const { row, col, hit, sunkShip, sunkCells } = result;
 
     if (isPlayerAttack) {
-      // Update target board
       if (sunkShip && sunkCells) {
         sunkCells.forEach(c => setCellState('target-board', c.row, c.col, 'sunk'));
         this.enemySunkShips.push(sunkShip);
         renderShipStatus('enemy-ship-status', SHIPS_CONFIG, this.enemySunkShips);
-        this.addLog(`You sunk the enemy's ${sunkShip}!`, 'sunk');
+        this.addLog(`💥 You sunk the enemy's ${sunkShip}!`, 'sunk');
+        soundManager.playSunk();
       } else if (hit) {
         setCellState('target-board', row, col, 'hit');
-        this.addLog(`Hit at ${COLS[col]}${row + 1}!`, 'hit');
+        this.addLog(`🔥 Hit at ${COLS[col]}${row + 1}!`, 'hit');
+        soundManager.playHit();
       } else {
         setCellState('target-board', row, col, 'miss');
-        this.addLog(`Miss at ${COLS[col]}${row + 1}`, 'miss');
+        this.addLog(`💨 Miss at ${COLS[col]}${row + 1}`, 'miss');
+        soundManager.playMiss();
       }
     } else {
-      // Update player board (enemy attack)
       if (sunkShip && sunkCells) {
         sunkCells.forEach(c => setCellState('player-board', c.row, c.col, 'sunk'));
         this.playerSunkShips.push(sunkShip);
         renderShipStatus('player-ship-status', SHIPS_CONFIG, this.playerSunkShips);
-        this.addLog(`Enemy sunk your ${sunkShip}!`, 'sunk');
+        this.addLog(`💀 Enemy sunk your ${sunkShip}!`, 'sunk');
+        soundManager.playSunk();
       } else if (hit) {
         setCellState('player-board', row, col, 'hit');
-        this.addLog(`Enemy hit at ${COLS[col]}${row + 1}!`, 'hit');
+        this.addLog(`💣 Enemy hit at ${COLS[col]}${row + 1}!`, 'hit');
+        soundManager.playHit();
       } else {
         setCellState('player-board', row, col, 'miss');
-        this.addLog(`Enemy missed at ${COLS[col]}${row + 1}`, 'miss');
+        this.addLog(`🌊 Enemy missed at ${COLS[col]}${row + 1}`, 'miss');
+        soundManager.playMiss();
       }
     }
   }
@@ -94,12 +98,15 @@ class GameUI {
     this.gameActive = false;
     const title = document.getElementById('gameover-title');
     const message = document.getElementById('gameover-message');
+    const icon = document.getElementById('gameover-icon');
 
     if (isWinner) {
+      icon.textContent = '🏆';
       title.textContent = 'Victory!';
       title.className = 'victory';
       message.textContent = 'You destroyed the enemy fleet! Admiral worthy performance!';
     } else {
+      icon.textContent = '💀';
       title.textContent = 'Defeat';
       title.className = 'defeat';
       message.textContent = 'Your fleet has been destroyed. Better luck next time, sailor.';

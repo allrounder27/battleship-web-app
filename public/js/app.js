@@ -48,7 +48,8 @@
   });
 
   socket.on('mp:created', ({ code }) => {
-    document.getElementById('lobby-status').textContent = `Room created! Code: ${code} — Waiting for opponent...`;
+    document.getElementById('lobby-status').innerHTML =
+      `Room created! Code: <strong class="room-code">${code}</strong> — Waiting for opponent...`;
   });
 
   socket.on('mp:joined', ({ players }) => {
@@ -69,6 +70,7 @@
   function initPlacement() {
     const readyBtn = document.getElementById('btn-ready');
     readyBtn.disabled = true;
+    document.getElementById('placement-status').textContent = '';
 
     if (shipPlacement) shipPlacement.destroy();
 
@@ -78,6 +80,7 @@
 
     document.getElementById('btn-random-placement').onclick = () => shipPlacement.randomize();
     document.getElementById('btn-reset-placement').onclick = () => shipPlacement.reset();
+    document.getElementById('btn-rotate').onclick = () => shipPlacement.rotate();
   }
 
   document.getElementById('btn-ready').addEventListener('click', () => {
@@ -163,9 +166,31 @@
     document.getElementById('gameover-message').textContent = 'Your opponent left the battle. Victory by default!';
   });
 
-  // ---------- GAME OVER ----------
+  // ---------- MULTIPLAYER REMATCH ----------
+  socket.on('mp:rematchWaiting', () => {
+    document.getElementById('gameover-message').textContent = 'Waiting for opponent to accept rematch...';
+  });
+
+  socket.on('mp:rematchRequested', () => {
+    document.getElementById('gameover-message').textContent = 'Opponent wants a rematch! Click Play Again to accept.';
+  });
+
+  socket.on('mp:rematchReady', () => {
+    showScreen('placement-screen');
+    initPlacement();
+  });
+
+  // ---------- GAME OVER BUTTONS ----------
   document.getElementById('btn-play-again').addEventListener('click', () => {
-    showScreen('menu-screen');
+    if (gameMode === 'ai') {
+      // Restart with same AI room
+      socket.emit('ai:restart');
+      showScreen('placement-screen');
+      initPlacement();
+    } else {
+      // Request rematch in multiplayer
+      socket.emit('mp:restart');
+    }
   });
 
   document.getElementById('btn-main-menu').addEventListener('click', () => {

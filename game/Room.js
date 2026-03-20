@@ -83,6 +83,17 @@ class Room {
   allShipsPlaced() {
     return this.players.every(p => this.shipPlacements[p] && this.shipPlacements[p].length === 5);
   }
+
+  resetForRematch() {
+    for (const id of this.players) {
+      this.boards[id] = createBoard();
+      this.shipPlacements[id] = [];
+    }
+    this.currentTurn = null;
+    if (this.ai) {
+      this.ai = new (require('./AI').AI)();
+    }
+  }
 }
 
 module.exports = { Room };

@@ -46,7 +46,6 @@ io.on('connection', (socket) => {
 
     if (result.gameOver) {
       socket.emit('ai:gameOver', { winner: 'player' });
-      rooms.delete(socket.id);
       return;
     }
 
@@ -61,7 +60,6 @@ io.on('connection', (socket) => {
 
       if (aiResult.gameOver) {
         socket.emit('ai:gameOver', { winner: 'computer' });
-        rooms.delete(socket.id);
       }
     }, 600);
   });
@@ -136,12 +134,37 @@ io.on('connection', (socket) => {
 
     if (result.gameOver) {
       io.to(code).emit('mp:gameOver', { winner: socket.id });
-      rooms.delete(code);
       return;
     }
 
     room.currentTurn = opponent;
     io.to(code).emit('mp:turnChange', { turn: opponent });
+  });
+
+  // ---------- REMATCH ----------
+  socket.on('ai:restart', () => {
+    const room = rooms.get(socket.id);
+    if (!room) return;
+    room.resetForRematch();
+    socket.emit('ai:ready');
+  });
+
+  socket.on('mp:restart', () => {
+    const code = socket.roomCode;
+    if (!code) return;
+    const room = rooms.get(code);
+    if (!room) return;
+    if (!room.rematchVotes) room.rematchVotes = new Set();
+    room.rematchVotes.add(socket.id);
+    if (room.rematchVotes.size === 2) {
+      room.resetForRematch();
+      room.rematchVotes = new Set();
+      io.to(code).emit('mp:rematchReady');
+    } else {
+      socket.emit('mp:rematchWaiting');
+      const opponent = room.getOpponent(socket.id);
+      io.to(opponent).emit('mp:rematchRequested');
+    }
   });
 
   // ---------- DISCONNECT ----------
