@@ -1,13 +1,21 @@
 // Main application controller
 (function () {
   const socket = io();
-  let gameMode = null; // 'ai' or 'multiplayer'
+  let gameMode = null;
+  let aiDifficulty = 'medium';
   let shipPlacement = null;
   let gameUI = new GameUI();
   let mySocketId = null;
 
-  socket.on('connect', () => {
-    mySocketId = socket.id;
+  socket.on('connect', () => { mySocketId = socket.id; });
+
+  // ---------- THEME TOGGLE ----------
+  const themeBtn = document.getElementById('btn-theme-toggle');
+  themeBtn.addEventListener('click', () => {
+    const html = document.documentElement;
+    const isDark = html.getAttribute('data-theme') === 'dark';
+    html.setAttribute('data-theme', isDark ? 'light' : 'dark');
+    themeBtn.textContent = isDark ? '☀️' : '🌙';
   });
 
   // ---------- SCREEN MANAGEMENT ----------
@@ -19,9 +27,7 @@
   // ---------- MAIN MENU ----------
   document.getElementById('btn-vs-ai').addEventListener('click', () => {
     gameMode = 'ai';
-    socket.emit('ai:start');
-    showScreen('placement-screen');
-    initPlacement();
+    showScreen('difficulty-screen');
   });
 
   document.getElementById('btn-multiplayer').addEventListener('click', () => {
@@ -29,10 +35,19 @@
     showScreen('lobby-screen');
   });
 
-  // ---------- MULTIPLAYER LOBBY ----------
-  document.getElementById('btn-create-room').addEventListener('click', () => {
-    socket.emit('mp:create');
+  // ---------- DIFFICULTY SELECT ----------
+  document.querySelectorAll('.diff-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      aiDifficulty = btn.dataset.diff;
+      socket.emit('ai:start', { difficulty: aiDifficulty });
+      showScreen('placement-screen');
+      initPlacement();
+    });
   });
+  document.getElementById('btn-diff-back').addEventListener('click', () => showScreen('menu-screen'));
+
+  // ---------- MULTIPLAYER LOBBY ----------
+  document.getElementById('btn-create-room').addEventListener('click', () => socket.emit('mp:create'));
 
   document.getElementById('btn-join-room').addEventListener('click', () => {
     const code = document.getElementById('room-code-input').value.trim();
@@ -43,22 +58,16 @@
     socket.emit('mp:join', { code });
   });
 
-  document.getElementById('btn-lobby-back').addEventListener('click', () => {
-    showScreen('menu-screen');
-  });
+  document.getElementById('btn-lobby-back').addEventListener('click', () => showScreen('menu-screen'));
 
   socket.on('mp:created', ({ code }) => {
-    document.getElementById('lobby-status').innerHTML =
-      `Room created! Code: <strong class="room-code">${code}</strong> — Waiting for opponent...`;
+    document.getElementById('lobby-status').innerHTML = `Room created! Code: <strong class="room-code">${code}</strong> — Waiting for opponent...`;
   });
 
   socket.on('mp:joined', ({ players }) => {
     if (players.length === 2) {
       document.getElementById('lobby-status').textContent = 'Opponent joined! Preparing fleet...';
-      setTimeout(() => {
-        showScreen('placement-screen');
-        initPlacement();
-      }, 1000);
+      setTimeout(() => { showScreen('placement-screen'); initPlacement(); }, 1000);
     }
   });
 
@@ -71,13 +80,8 @@
     const readyBtn = document.getElementById('btn-ready');
     readyBtn.disabled = true;
     document.getElementById('placement-status').textContent = '';
-
     if (shipPlacement) shipPlacement.destroy();
-
-    shipPlacement = new ShipPlacement('placement-board', 'dock-ships', (allPlaced) => {
-      readyBtn.disabled = !allPlaced;
-    });
-
+    shipPlacement = new ShipPlacement('placement-board', 'dock-ships', (allPlaced) => { readyBtn.disabled = !allPlaced; });
     document.getElementById('btn-random-placement').onclick = () => shipPlacement.randomize();
     document.getElementById('btn-reset-placement').onclick = () => shipPlacement.reset();
     document.getElementById('btn-rotate').onclick = () => shipPlacement.rotate();
@@ -86,7 +90,6 @@
   document.getElementById('btn-ready').addEventListener('click', () => {
     const placement = shipPlacement.getPlacement();
     if (placement.length !== 5) return;
-
     if (gameMode === 'ai') {
       socket.emit('ai:placeShips', placement);
       document.getElementById('placement-status').textContent = 'Ships deployed! Starting battle...';
@@ -97,9 +100,7 @@
   });
 
   // ---------- AI GAME ----------
-  socket.on('ai:ready', () => {
-    // Placement screen already shown
-  });
+  socket.on('ai:ready', () => { });
 
   socket.on('ai:gameStart', ({ turn }) => {
     const placement = shipPlacement.getPlacement();
@@ -115,18 +116,13 @@
   socket.on('ai:attackResult', (result) => {
     const isPlayerAttack = result.attacker === 'player';
     gameUI.handleAttackResult(result, isPlayerAttack);
-
     if (!result.gameOver) {
-      if (isPlayerAttack) {
-        gameUI.setTurn(false);
-      } else {
-        gameUI.setTurn(true);
-      }
+      gameUI.setTurn(!isPlayerAttack ? true : false);
     }
   });
 
-  socket.on('ai:gameOver', ({ winner }) => {
-    gameUI.showGameOver(winner === 'player');
+  socket.on('ai:gameOver', (data) => {
+    gameUI.showGameOver(data.winner === 'player', data);
     showScreen('gameover-screen');
   });
 
@@ -146,54 +142,54 @@
   });
 
   socket.on('mp:attackResult', (result) => {
-    const isPlayerAttack = result.attacker === mySocketId;
-    gameUI.handleAttackResult(result, isPlayerAttack);
+    gameUI.handleAttackResult(result, result.attacker === mySocketId);
   });
 
   socket.on('mp:turnChange', ({ turn }) => {
     gameUI.setTurn(turn === mySocketId);
   });
 
-  socket.on('mp:gameOver', ({ winner }) => {
-    gameUI.showGameOver(winner === mySocketId);
+  socket.on('mp:timerStart', ({ timeLimit }) => {
+    gameUI.startTimer(timeLimit);
+  });
+
+  socket.on('mp:gameOver', (data) => {
+    const isWinner = data.winner === mySocketId;
+    const opponentId = isWinner ? Object.keys(data.ships).find(k => k !== mySocketId) : data.winner;
+    const goData = {
+      opponentShips: data.ships ? data.ships[opponentId] : null,
+      stats: data.stats ? data.stats[mySocketId] : null
+    };
+    gameUI.showGameOver(isWinner, goData);
     showScreen('gameover-screen');
   });
 
   socket.on('mp:opponentLeft', () => {
     gameUI.addLog('Opponent disconnected!', 'sunk');
-    gameUI.showGameOver(true);
+    gameUI.showGameOver(true, {});
     showScreen('gameover-screen');
-    document.getElementById('gameover-message').textContent = 'Your opponent left the battle. Victory by default!';
+    document.getElementById('gameover-message').textContent = 'Your opponent left. Victory by default!';
   });
 
-  // ---------- MULTIPLAYER REMATCH ----------
+  // ---------- REMATCH ----------
   socket.on('mp:rematchWaiting', () => {
     document.getElementById('gameover-message').textContent = 'Waiting for opponent to accept rematch...';
   });
-
   socket.on('mp:rematchRequested', () => {
-    document.getElementById('gameover-message').textContent = 'Opponent wants a rematch! Click Play Again to accept.';
+    document.getElementById('gameover-message').textContent = 'Opponent wants a rematch! Click Play Again.';
   });
-
-  socket.on('mp:rematchReady', () => {
-    showScreen('placement-screen');
-    initPlacement();
-  });
+  socket.on('mp:rematchReady', () => { showScreen('placement-screen'); initPlacement(); });
 
   // ---------- GAME OVER BUTTONS ----------
   document.getElementById('btn-play-again').addEventListener('click', () => {
     if (gameMode === 'ai') {
-      // Restart with same AI room
-      socket.emit('ai:restart');
+      socket.emit('ai:restart', { difficulty: aiDifficulty });
       showScreen('placement-screen');
       initPlacement();
     } else {
-      // Request rematch in multiplayer
       socket.emit('mp:restart');
     }
   });
 
-  document.getElementById('btn-main-menu').addEventListener('click', () => {
-    showScreen('menu-screen');
-  });
+  document.getElementById('btn-main-menu').addEventListener('click', () => showScreen('menu-screen'));
 })();

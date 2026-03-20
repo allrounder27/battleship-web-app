@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -11,6 +11,7 @@
   <!-- MAIN MENU -->
   <div id="menu-screen" class="screen active">
     <div class="menu-container">
+      <button id="btn-theme-toggle" class="theme-toggle" title="Toggle theme">🌙</button>
       <div class="title-section">
         <div class="logo-glow"></div>
         <h1 class="game-title">BATTLESHIP</h1>
@@ -29,6 +30,31 @@
           <span class="btn-arrow">→</span>
         </button>
       </div>
+    </div>
+  </div>
+
+  <!-- AI DIFFICULTY SELECT -->
+  <div id="difficulty-screen" class="screen">
+    <div class="difficulty-container">
+      <h2>Select Difficulty</h2>
+      <div class="difficulty-options">
+        <button class="menu-btn diff-btn" data-diff="easy">
+          <span class="btn-icon">🟢</span>
+          <span class="btn-text">Easy<small>Random attacks</small></span>
+          <span class="btn-arrow">→</span>
+        </button>
+        <button class="menu-btn diff-btn" data-diff="medium">
+          <span class="btn-icon">🟡</span>
+          <span class="btn-text">Medium<small>Hunt &amp; target</small></span>
+          <span class="btn-arrow">→</span>
+        </button>
+        <button class="menu-btn diff-btn" data-diff="hard">
+          <span class="btn-icon">🔴</span>
+          <span class="btn-text">Hard<small>Probability analysis</small></span>
+          <span class="btn-arrow">→</span>
+        </button>
+      </div>
+      <button id="btn-diff-back" class="back-btn">← Back to Menu</button>
     </div>
   </div>
 
@@ -60,15 +86,15 @@
     <div class="placement-container">
       <h2>Deploy Your Fleet</h2>
       <p class="placement-instructions">
-        <span class="desktop-hint">Drag ships onto the board &bull; Right-click or press R to rotate</span>
-        <span class="mobile-hint">Tap a ship, then tap the board &bull; Use rotate button</span>
+        <span class="desktop-hint">Click a ship then click the board to place &bull; Right-click or R to rotate &bull; Click placed ship to pick up</span>
+        <span class="mobile-hint">Tap a ship, then tap the board &bull; Use rotate button &bull; Tap a placed ship to pick up</span>
       </p>
       <div class="placement-layout">
         <div class="ship-dock" id="ship-dock">
           <h3>Fleet</h3>
           <div class="dock-ships" id="dock-ships"></div>
           <div class="dock-actions">
-            <button id="btn-rotate" class="action-btn rotate-btn">↻ Rotate</button>
+            <button id="btn-rotate" class="action-btn">↻ Rotate</button>
             <button id="btn-random-placement" class="action-btn">🎲 Random</button>
             <button id="btn-reset-placement" class="action-btn">✕ Reset</button>
           </div>
@@ -86,7 +112,13 @@
   <!-- GAME SCREEN -->
   <div id="game-screen" class="screen">
     <div class="game-container">
-      <div id="turn-indicator" class="turn-indicator">Your Turn</div>
+      <div class="game-top-bar">
+        <div id="turn-indicator" class="turn-indicator">Your Turn</div>
+        <div id="turn-timer" class="turn-timer hidden">
+          <div class="timer-bar" id="timer-bar"></div>
+        </div>
+        <div class="scoreboard" id="scoreboard"></div>
+      </div>
       <div class="boards-container">
         <div class="board-section">
           <div class="board-label">Your Fleet</div>
@@ -110,6 +142,17 @@
       <div class="gameover-icon" id="gameover-icon">🏆</div>
       <h2 id="gameover-title">Game Over</h2>
       <p id="gameover-message"></p>
+      <div id="gameover-stats" class="gameover-stats"></div>
+      <div id="gameover-boards" class="gameover-boards">
+        <div class="gameover-board-section">
+          <div class="board-label">Your Fleet</div>
+          <div class="board board-small" id="go-player-board"></div>
+        </div>
+        <div class="gameover-board-section">
+          <div class="board-label">Enemy Fleet</div>
+          <div class="board board-small" id="go-enemy-board"></div>
+        </div>
+      </div>
       <div class="gameover-buttons">
         <button id="btn-play-again" class="menu-btn primary-btn">
           <span class="btn-icon">🔄</span>
@@ -123,11 +166,15 @@
     </div>
   </div>
 
+  <!-- CONFETTI CANVAS -->
+  <canvas id="confetti-canvas"></canvas>
+
   <script src="/socket.io/socket.io.js"></script>
   <script src="js/Sound.js"></script>
   <script src="js/Board.js"></script>
   <script src="js/ShipPlacement.js"></script>
   <script src="js/GameUI.js"></script>
+  <script src="js/Confetti.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

@@ -1,4 +1,4 @@
-// Ship placement with drag-and-drop + touch support
+// Ship placement with click-to-place + drag-and-drop + touch support + undo
 class ShipPlacement {
   constructor(boardId, dockId, onAllPlaced) {
     this.boardId = boardId;
@@ -7,9 +7,9 @@ class ShipPlacement {
     this.ships = SHIPS_CONFIG.map(s => ({ ...s, placed: false, row: -1, col: -1, horizontal: true }));
     this.boardState = Array.from({ length: BOARD_SIZE }, () => Array(BOARD_SIZE).fill(null));
     this.currentDragShip = null;
-    this.selectedShip = null; // For tap-to-place on mobile
-    this.currentRotation = true; // true = horizontal
-    this.dragOffset = 0; // Offset within the ship for centered preview
+    this.selectedShip = null;
+    this.currentRotation = true;
+    this.dragOffset = 0;
     this.init();
   }
 
@@ -18,7 +18,6 @@ class ShipPlacement {
     createBoardDOM(this.boardId);
     this.setupBoardEvents();
     this.setupKeyboardRotation();
-    this.setupTouchPlacement();
   }
 
   renderDock() {
@@ -27,8 +26,7 @@ class ShipPlacement {
     for (let i = 0; i < this.ships.length; i++) {
       const ship = this.ships[i];
       const shipEl = document.createElement('div');
-      shipEl.className = 'dock-ship' + (ship.placed ? ' placed' : '') +
-        (this.selectedShip === i ? ' selected' : '');
+      shipEl.className = 'dock-ship' + (ship.placed ? ' placed' : '') + (this.selectedShip === i ? ' selected' : '');
       shipEl.draggable = !ship.placed;
       shipEl.dataset.index = i;
 
@@ -44,32 +42,21 @@ class ShipPlacement {
         shipEl.appendChild(cell);
       }
 
-      // Drag start — calculate offset from mouse position to center the preview
       shipEl.addEventListener('dragstart', (e) => {
         this.currentDragShip = i;
         this.selectedShip = null;
-
-        // Determine which cell within the ship was grabbed
         const clickedCell = e.target.closest('.dock-ship-cell');
-        if (clickedCell) {
-          this.dragOffset = parseInt(clickedCell.dataset.cellIndex) || 0;
-        } else {
-          this.dragOffset = Math.floor(ship.size / 2);
-        }
-
+        this.dragOffset = clickedCell ? (parseInt(clickedCell.dataset.cellIndex) || 0) : Math.floor(ship.size / 2);
         e.dataTransfer.effectAllowed = 'move';
         e.dataTransfer.setData('text/plain', i.toString());
-
-        // Create a minimal drag image (1x1 transparent pixel)
         const ghost = document.createElement('canvas');
-        ghost.width = 1;
-        ghost.height = 1;
+        ghost.width = 1; ghost.height = 1;
         document.body.appendChild(ghost);
         e.dataTransfer.setDragImage(ghost, 0, 0);
         requestAnimationFrame(() => ghost.remove());
       });
 
-      // Tap to select (mobile)
+      // Click to select
       shipEl.addEventListener('click', (e) => {
         if (ship.placed) return;
         this.selectedShip = (this.selectedShip === i) ? null : i;
@@ -77,7 +64,6 @@ class ShipPlacement {
         this.renderDock();
       });
 
-      // Right-click to rotate
       shipEl.addEventListener('contextmenu', (e) => {
         e.preventDefault();
         this.currentRotation = !this.currentRotation;
@@ -91,6 +77,7 @@ class ShipPlacement {
   setupBoardEvents() {
     const board = document.getElementById(this.boardId);
 
+    // Drag events
     board.addEventListener('dragover', (e) => {
       e.preventDefault();
       e.dataTransfer.dropEffect = 'move';
@@ -105,11 +92,8 @@ class ShipPlacement {
     });
 
     board.addEventListener('dragleave', (e) => {
-      // Only clear if actually leaving the board
       const related = e.relatedTarget;
-      if (!related || !board.contains(related)) {
-        this.clearPreview();
-      }
+      if (!related || !board.contains(related)) this.clearPreview();
     });
 
     board.addEventListener('drop', (e) => {
@@ -126,27 +110,39 @@ class ShipPlacement {
       this.currentDragShip = null;
     });
 
-    // Right-click on board to rotate during drag
     board.addEventListener('contextmenu', (e) => {
       e.preventDefault();
       this.currentRotation = !this.currentRotation;
       this.showRotationHint();
+    });
+
+    // Click-to-place on board (works for both mobile and desktop)
+    board.addEventListener('click', (e) => {
       const cell = e.target.closest('.cell');
-      if (cell && this.currentDragShip !== null) {
-        const row = parseInt(cell.dataset.row);
-        const col = parseInt(cell.dataset.col);
-        const ship = this.ships[this.currentDragShip];
+      if (!cell) return;
+      const row = parseInt(cell.dataset.row);
+      const col = parseInt(cell.dataset.col);
+
+      // If clicking on a placed ship, pick it up (undo)
+      const shipIdx = this.boardState[row][col];
+      if (shipIdx !== null && this.selectedShip === null) {
+        this.pickUpShip(shipIdx);
+        return;
+      }
+
+      // Place selected ship
+      if (this.selectedShip !== null) {
+        const ship = this.ships[this.selectedShip];
         const { adjRow, adjCol } = this._adjustForOffset(row, col, ship.size, this.currentRotation);
-        this.showPreview(adjRow, adjCol, ship.size, this.currentRotation, this.currentDragShip);
+        if (this.tryPlace(this.selectedShip, adjRow, adjCol, this.currentRotation)) {
+          this.selectedShip = null;
+          this.renderDock();
+        }
       }
     });
-  }
 
-  setupTouchPlacement() {
-    const board = document.getElementById(this.boardId);
-
-    // Tap on board cell to place selected ship (mobile)
-    board.addEventListener('click', (e) => {
+    // Hover preview when ship is selected
+    board.addEventListener('mousemove', (e) => {
       if (this.selectedShip === null) return;
       const cell = e.target.closest('.cell');
       if (!cell) return;
@@ -154,15 +150,25 @@ class ShipPlacement {
       const col = parseInt(cell.dataset.col);
       const ship = this.ships[this.selectedShip];
       const { adjRow, adjCol } = this._adjustForOffset(row, col, ship.size, this.currentRotation);
-      if (this.tryPlace(this.selectedShip, adjRow, adjCol, this.currentRotation)) {
-        this.selectedShip = null;
-        this.renderDock();
-      }
+      this.showPreview(adjRow, adjCol, ship.size, this.currentRotation, this.selectedShip);
+    });
+
+    board.addEventListener('mouseleave', () => {
+      this.clearPreview();
     });
   }
 
+  pickUpShip(shipIndex) {
+    const ship = this.ships[shipIndex];
+    if (!ship.placed) return;
+    this.removeShipFromBoard(shipIndex);
+    this.selectedShip = shipIndex;
+    this.dragOffset = Math.floor(ship.size / 2);
+    this.renderDock();
+    this.showRotationHint();
+  }
+
   _adjustForOffset(row, col, size, horizontal) {
-    // Center the placement based on the drag offset
     if (horizontal) {
       return { adjRow: row, adjCol: Math.max(0, Math.min(col - this.dragOffset, BOARD_SIZE - size)) };
     } else {
@@ -181,9 +187,7 @@ class ShipPlacement {
   }
 
   destroy() {
-    if (this._keyHandler) {
-      document.removeEventListener('keydown', this._keyHandler);
-    }
+    if (this._keyHandler) document.removeEventListener('keydown', this._keyHandler);
   }
 
   rotate() {
@@ -196,12 +200,7 @@ class ShipPlacement {
     if (status) {
       status.textContent = `Rotation: ${this.currentRotation ? 'Horizontal →' : 'Vertical ↓'}`;
       status.className = 'status-message info';
-      setTimeout(() => {
-        if (status.textContent.startsWith('Rotation')) {
-          status.textContent = '';
-          status.className = 'status-message';
-        }
-      }, 1500);
+      setTimeout(() => { if (status.textContent.startsWith('Rotation')) { status.textContent = ''; status.className = 'status-message'; } }, 1500);
     }
   }
 
@@ -214,7 +213,6 @@ class ShipPlacement {
       if (r >= 0 && r < BOARD_SIZE && c >= 0 && c < BOARD_SIZE) {
         const cell = getCell(this.boardId, r, c);
         if (cell) {
-          // Don't overwrite existing ship cells from other ships with preview
           if (!cell.classList.contains('ship')) {
             setCellState(this.boardId, r, c, valid ? 'ship-preview' : 'ship-preview-invalid');
           } else if (!valid) {
@@ -244,27 +242,23 @@ class ShipPlacement {
 
   tryPlace(shipIndex, row, col, horizontal) {
     const ship = this.ships[shipIndex];
-
-    // Remove previous placement first
-    if (ship.placed) {
-      this.removeShipFromBoard(shipIndex);
-    }
-
+    if (ship.placed) this.removeShipFromBoard(shipIndex);
     if (!this.canPlace(row, col, ship.size, horizontal, shipIndex)) return false;
 
-    // Place the ship
     for (let i = 0; i < ship.size; i++) {
       const r = horizontal ? row : row + i;
       const c = horizontal ? col + i : col;
       this.boardState[r][c] = shipIndex;
       setCellState(this.boardId, r, c, 'ship');
+      // Set ship name for silhouette labeling
+      const cell = getCell(this.boardId, r, c);
+      if (cell) cell.dataset.shipName = ship.name;
     }
 
     ship.placed = true;
     ship.row = row;
     ship.col = col;
     ship.horizontal = horizontal;
-
     this.renderDock();
     this.checkAllPlaced();
     return true;
@@ -276,6 +270,8 @@ class ShipPlacement {
         if (this.boardState[r][c] === shipIndex) {
           this.boardState[r][c] = null;
           setCellState(this.boardId, r, c, null);
+          const cell = getCell(this.boardId, r, c);
+          if (cell) delete cell.dataset.shipName;
         }
       }
     }
@@ -285,29 +281,22 @@ class ShipPlacement {
   }
 
   checkAllPlaced() {
-    const allPlaced = this.ships.every(s => s.placed);
-    this.onAllPlaced(allPlaced);
+    this.onAllPlaced(this.ships.every(s => s.placed));
   }
 
   randomize() {
     this.reset();
     for (let i = 0; i < this.ships.length; i++) {
-      let placed = false;
-      let attempts = 0;
+      let placed = false, attempts = 0;
       while (!placed && attempts < 1000) {
-        const horizontal = Math.random() < 0.5;
-        const row = Math.floor(Math.random() * BOARD_SIZE);
-        const col = Math.floor(Math.random() * BOARD_SIZE);
-        placed = this.tryPlace(i, row, col, horizontal);
+        placed = this.tryPlace(i, Math.floor(Math.random() * BOARD_SIZE), Math.floor(Math.random() * BOARD_SIZE), Math.random() < 0.5);
         attempts++;
       }
     }
   }
 
   reset() {
-    for (let i = 0; i < this.ships.length; i++) {
-      this.removeShipFromBoard(i);
-    }
+    for (let i = 0; i < this.ships.length; i++) this.removeShipFromBoard(i);
     this.boardState = Array.from({ length: BOARD_SIZE }, () => Array(BOARD_SIZE).fill(null));
     clearBoard(this.boardId);
     this.selectedShip = null;
@@ -316,12 +305,6 @@ class ShipPlacement {
   }
 
   getPlacement() {
-    return this.ships.filter(s => s.placed).map(s => ({
-      name: s.name,
-      size: s.size,
-      row: s.row,
-      col: s.col,
-      horizontal: s.horizontal
-    }));
+    return this.ships.filter(s => s.placed).map(s => ({ name: s.name, size: s.size, row: s.row, col: s.col, horizontal: s.horizontal }));
   }
 }

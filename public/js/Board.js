@@ -13,12 +13,10 @@ function createBoardDOM(containerId, onClick) {
   const container = document.getElementById(containerId);
   container.innerHTML = '';
 
-  // Corner
   const corner = document.createElement('div');
   corner.className = 'board-header corner';
   container.appendChild(corner);
 
-  // Column headers
   for (let c = 0; c < BOARD_SIZE; c++) {
     const header = document.createElement('div');
     header.className = 'board-header';
@@ -26,7 +24,6 @@ function createBoardDOM(containerId, onClick) {
     container.appendChild(header);
   }
 
-  // Rows
   for (let r = 0; r < BOARD_SIZE; r++) {
     const rowHeader = document.createElement('div');
     rowHeader.className = 'board-header';
@@ -54,7 +51,7 @@ function getCell(containerId, row, col) {
 function setCellState(containerId, row, col, state) {
   const cell = getCell(containerId, row, col);
   if (!cell) return;
-  cell.classList.remove('ship', 'hit', 'miss', 'sunk', 'ship-preview', 'ship-preview-invalid');
+  cell.classList.remove('ship', 'ship-silhouette', 'hit', 'miss', 'sunk', 'ship-preview', 'ship-preview-invalid');
   if (state) cell.classList.add(state);
 }
 
@@ -62,7 +59,8 @@ function clearBoard(containerId) {
   const container = document.getElementById(containerId);
   const cells = container.querySelectorAll('.cell');
   cells.forEach(cell => {
-    cell.classList.remove('ship', 'hit', 'miss', 'sunk', 'ship-preview', 'ship-preview-invalid');
+    cell.classList.remove('ship', 'ship-silhouette', 'hit', 'miss', 'sunk', 'ship-preview', 'ship-preview-invalid');
+    delete cell.dataset.shipName;
   });
 }
 
@@ -76,5 +74,24 @@ function renderShipStatus(containerId, ships, sunkShips) {
     const dots = '■'.repeat(ship.size);
     item.innerHTML = `<span class="dot"></span><span class="ship-name">${ship.name}</span><span class="ship-dots">${dots}</span>`;
     container.appendChild(item);
+  }
+}
+
+// Render a mini board for game-over display showing all ships
+function renderGameOverBoard(containerId, shipPlacements, boardState) {
+  createBoardDOM(containerId);
+  // Show ships
+  if (shipPlacements) {
+    for (const ship of shipPlacements) {
+      for (const cell of ship.cells) {
+        const el = getCell(containerId, cell.row, cell.col);
+        if (!el) continue;
+        if (ship.sunk) {
+          el.classList.add('sunk');
+        } else {
+          el.classList.add('ship');
+        }
+      }
+    }
   }
 }

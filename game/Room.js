@@ -3,23 +3,34 @@ const { AI } = require('./AI');
 
 class Room {
   constructor(mode) {
-    this.mode = mode; // 'ai' or 'multiplayer'
+    this.mode = mode;
     this.players = [];
     this.boards = {};
     this.shipPlacements = {};
     this.currentTurn = null;
-    this.ai = mode === 'ai' ? new AI() : null;
+    this.ai = null;
+    this.aiDifficulty = 'medium';
+    this.lastActivity = Date.now();
+    this.turnTimer = null;
+    this.turnTimeLimit = 15000; // 15 seconds
+    // Stats
+    this.stats = {};
   }
 
   addPlayer(playerId) {
     this.players.push(playerId);
     this.boards[playerId] = createBoard();
     this.shipPlacements[playerId] = [];
+    this.stats[playerId] = { shots: 0, hits: 0 };
+  }
+
+  setAIDifficulty(difficulty) {
+    this.aiDifficulty = difficulty;
+    this.ai = new AI(difficulty);
   }
 
   placeShips(playerId, ships) {
     const board = this.boards[playerId];
-    // Reset the board
     for (let r = 0; r < 10; r++) {
       for (let c = 0; c < 10; c++) {
         board[r][c] = 0;
@@ -39,6 +50,7 @@ class Room {
         });
       }
     }
+    this.lastActivity = Date.now();
   }
 
   placeShipsRandom(playerId) {
@@ -51,18 +63,19 @@ class Room {
     const board = this.boards[defenderId];
     const placements = this.shipPlacements[defenderId];
     const result = processAttack(board, placements, row, col);
-
-    if (result && result.hit && this.ai && attackerId === 'computer') {
-      // Don't register AI hits here; AI registers in getAIMove
+    if (result) {
+      if (this.stats[attackerId]) {
+        this.stats[attackerId].shots++;
+        if (result.hit) this.stats[attackerId].hits++;
+      }
     }
-
+    this.lastActivity = Date.now();
     return result;
   }
 
   getAIMove(humanPlayerId) {
     if (!this.ai) return null;
-    const move = this.ai.getMove(this.boards[humanPlayerId]);
-    return move;
+    return this.ai.getMove(this.boards[humanPlayerId]);
   }
 
   registerAIResult(result) {
@@ -84,15 +97,35 @@ class Room {
     return this.players.every(p => this.shipPlacements[p] && this.shipPlacements[p].length === 5);
   }
 
+  getShipPlacements(playerId) {
+    return (this.shipPlacements[playerId] || []).map(s => ({
+      name: s.name,
+      size: s.size,
+      cells: s.cells,
+      horizontal: s.horizontal,
+      sunk: s.sunk
+    }));
+  }
+
+  getStats(playerId) {
+    return this.stats[playerId] || { shots: 0, hits: 0 };
+  }
+
   resetForRematch() {
     for (const id of this.players) {
       this.boards[id] = createBoard();
       this.shipPlacements[id] = [];
+      this.stats[id] = { shots: 0, hits: 0 };
     }
     this.currentTurn = null;
     if (this.ai) {
-      this.ai = new (require('./AI').AI)();
+      this.ai = new AI(this.aiDifficulty);
     }
+    this.lastActivity = Date.now();
+  }
+
+  isStale(maxAge = 30 * 60 * 1000) {
+    return Date.now() - this.lastActivity > maxAge;
   }
 }
 

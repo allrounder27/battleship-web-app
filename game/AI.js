@@ -1,55 +1,158 @@
-const { BOARD_SIZE, CELL } = require('./GameLogic');
+const { BOARD_SIZE, CELL, SHIPS } = require('./GameLogic');
 
 class AI {
-  constructor() {
-    this.huntMode = false;
+  constructor(difficulty = 'medium') {
+    this.difficulty = difficulty; // 'easy', 'medium', 'hard'
     this.hitStack = [];
     this.attackedCells = new Set();
   }
 
   getMove(opponentBoard) {
-    let row, col;
+    switch (this.difficulty) {
+      case 'easy': return this._easyMove();
+      case 'hard': return this._hardMove(opponentBoard);
+      default: return this._mediumMove(opponentBoard);
+    }
+  }
 
-    if (this.hitStack.length > 0) {
-      // Target mode: try adjacent cells around hits
-      while (this.hitStack.length > 0) {
-        const target = this.hitStack.pop();
-        row = target.row;
-        col = target.col;
-        const key = `${row},${col}`;
-        if (!this.attackedCells.has(key) && row >= 0 && row < BOARD_SIZE && col >= 0 && col < BOARD_SIZE) {
-          this.attackedCells.add(key);
-          return { row, col };
-        }
+  // Easy: pure random
+  _easyMove() {
+    const available = [];
+    for (let r = 0; r < BOARD_SIZE; r++) {
+      for (let c = 0; c < BOARD_SIZE; c++) {
+        if (!this.attackedCells.has(`${r},${c}`)) available.push({ row: r, col: c });
+      }
+    }
+    if (available.length === 0) return null;
+    const pick = available[Math.floor(Math.random() * available.length)];
+    this.attackedCells.add(`${pick.row},${pick.col}`);
+    return pick;
+  }
+
+  // Medium: hunt-target strategy
+  _mediumMove(opponentBoard) {
+    // Target mode
+    while (this.hitStack.length > 0) {
+      const target = this.hitStack.pop();
+      const key = `${target.row},${target.col}`;
+      if (!this.attackedCells.has(key) && target.row >= 0 && target.row < BOARD_SIZE && target.col >= 0 && target.col < BOARD_SIZE) {
+        this.attackedCells.add(key);
+        return target;
+      }
+    }
+    // Hunt mode: checkerboard
+    let attempts = 0;
+    while (attempts < 200) {
+      const row = Math.floor(Math.random() * BOARD_SIZE);
+      const col = Math.floor(Math.random() * BOARD_SIZE);
+      const key = `${row},${col}`;
+      if (!this.attackedCells.has(key) && (row + col) % 2 === 0) {
+        this.attackedCells.add(key);
+        return { row, col };
+      }
+      attempts++;
+    }
+    // Fallback
+    return this._easyMove();
+  }
+
+  // Hard: probability density map
+  _hardMove(opponentBoard) {
+    // If we have targets from hits, prioritize those
+    while (this.hitStack.length > 0) {
+      const target = this.hitStack.pop();
+      const key = `${target.row},${target.col}`;
+      if (!this.attackedCells.has(key) && target.row >= 0 && target.row < BOARD_SIZE && target.col >= 0 && target.col < BOARD_SIZE) {
+        this.attackedCells.add(key);
+        return target;
       }
     }
 
-    // Hunt mode: random attack on a checkerboard pattern for efficiency
-    let attempts = 0;
-    do {
-      row = Math.floor(Math.random() * BOARD_SIZE);
-      col = Math.floor(Math.random() * BOARD_SIZE);
-      attempts++;
-      // Checkerboard pattern: only target cells where (row + col) is even
-      if (attempts > 50) {
-        // Fall back to any untried cell
-        for (let r = 0; r < BOARD_SIZE; r++) {
-          for (let c = 0; c < BOARD_SIZE; c++) {
-            if (!this.attackedCells.has(`${r},${c}`)) {
-              this.attackedCells.add(`${r},${c}`);
-              return { row: r, col: c };
+    // Build probability density map
+    const density = Array.from({ length: BOARD_SIZE }, () => Array(BOARD_SIZE).fill(0));
+
+    // Determine remaining ship sizes
+    const remainingSizes = [];
+    for (const ship of SHIPS) {
+      // Check if this ship is NOT fully sunk by looking at the board
+      // We don't have direct access to placements, so use ship sizes
+      remainingSizes.push(ship.size);
+    }
+
+    // For each remaining ship size, count valid placements
+    for (const size of remainingSizes) {
+      // Horizontal
+      for (let r = 0; r < BOARD_SIZE; r++) {
+        for (let c = 0; c <= BOARD_SIZE - size; c++) {
+          let valid = true;
+          for (let i = 0; i < size; i++) {
+            const key = `${r},${c + i}`;
+            if (this.attackedCells.has(key)) {
+              // Check if it was a miss (we track all attacks)
+              if (opponentBoard[r][c + i] === CELL.MISS || opponentBoard[r][c + i] === CELL.SUNK) {
+                valid = false;
+                break;
+              }
+            }
+          }
+          if (valid) {
+            for (let i = 0; i < size; i++) {
+              if (!this.attackedCells.has(`${r},${c + i}`)) {
+                density[r][c + i]++;
+              }
             }
           }
         }
       }
-    } while (this.attackedCells.has(`${row},${col}`) || (row + col) % 2 !== 0);
+      // Vertical
+      for (let r = 0; r <= BOARD_SIZE - size; r++) {
+        for (let c = 0; c < BOARD_SIZE; c++) {
+          let valid = true;
+          for (let i = 0; i < size; i++) {
+            const key = `${r + i},${c}`;
+            if (this.attackedCells.has(key)) {
+              if (opponentBoard[r + i][c] === CELL.MISS || opponentBoard[r + i][c] === CELL.SUNK) {
+                valid = false;
+                break;
+              }
+            }
+          }
+          if (valid) {
+            for (let i = 0; i < size; i++) {
+              if (!this.attackedCells.has(`${r + i},${c}`)) {
+                density[r + i][c]++;
+              }
+            }
+          }
+        }
+      }
+    }
 
-    this.attackedCells.add(`${row},${col}`);
-    return { row, col };
+    // Pick cell with highest density
+    let maxDensity = 0;
+    let bestCells = [];
+    for (let r = 0; r < BOARD_SIZE; r++) {
+      for (let c = 0; c < BOARD_SIZE; c++) {
+        if (this.attackedCells.has(`${r},${c}`)) continue;
+        if (density[r][c] > maxDensity) {
+          maxDensity = density[r][c];
+          bestCells = [{ row: r, col: c }];
+        } else if (density[r][c] === maxDensity && maxDensity > 0) {
+          bestCells.push({ row: r, col: c });
+        }
+      }
+    }
+
+    if (bestCells.length > 0) {
+      const pick = bestCells[Math.floor(Math.random() * bestCells.length)];
+      this.attackedCells.add(`${pick.row},${pick.col}`);
+      return pick;
+    }
+
+    return this._easyMove();
   }
 
   registerHit(row, col) {
-    // Add adjacent cells to hunt stack
     const adjacents = [
       { row: row - 1, col },
       { row: row + 1, col },
@@ -65,7 +168,6 @@ class AI {
   }
 
   registerSunk() {
-    // Clear the hit stack when a ship is sunk to go back to hunt mode
     this.hitStack = [];
   }
 }

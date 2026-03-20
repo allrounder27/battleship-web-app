@@ -8,13 +8,7 @@ const SHIPS = [
   { name: 'Destroyer', size: 2 }
 ];
 
-const CELL = {
-  EMPTY: 0,
-  SHIP: 1,
-  HIT: 2,
-  MISS: 3,
-  SUNK: 4
-};
+const CELL = { EMPTY: 0, SHIP: 1, HIT: 2, MISS: 3, SUNK: 4 };
 
 function createBoard() {
   return Array.from({ length: BOARD_SIZE }, () => Array(BOARD_SIZE).fill(CELL.EMPTY));
@@ -65,20 +59,30 @@ function processAttack(board, shipPlacements, row, col) {
 
   if (board[row][col] === CELL.SHIP) {
     board[row][col] = CELL.HIT;
-    // Check for sunk
+
+    // Find which ship was hit
+    let hitShipName = null;
+    for (const ship of shipPlacements) {
+      if (ship.cells.some(c => c.row === row && c.col === col)) {
+        hitShipName = ship.name;
+        break;
+      }
+    }
+
     const sunkShip = checkSunk(board, shipPlacements);
     const allSunk = shipPlacements.every(s => s.sunk);
     return {
       hit: true,
       row,
       col,
+      hitShipName,
       sunkShip: sunkShip ? sunkShip.name : null,
       sunkCells: sunkShip ? sunkShip.cells : null,
       gameOver: allSunk
     };
   } else {
     board[row][col] = CELL.MISS;
-    return { hit: false, row, col, sunkShip: null, sunkCells: null, gameOver: false };
+    return { hit: false, row, col, hitShipName: null, sunkShip: null, sunkCells: null, gameOver: false };
   }
 }
 
